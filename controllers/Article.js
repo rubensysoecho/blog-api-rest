@@ -1,26 +1,13 @@
-const validator = require('validator')
+const fs = require('fs')
+const { validateArticle } = require('../helper/validate')
 const Article = require('../models/Article')
-
-const test = (req, res) => {
-    return res.status(200).json({
-        msg: "Esto es un test"
-    })
-}
 
 const save = (req, res) => {
 
     let params = req.body
 
     try {
-        let validate_title = !validator.isEmpty(params.title) &&
-            validator.isLength(params.title, { min: 5, max: 15 })
-
-        let validate_content = !validator.isEmpty(params.content)
-
-        if (!validate_title || !validate_content) {
-            throw new Error('❌ Data couldnt be validated')
-        }
-
+        validateArticle(res, params)
     } catch (error) {
         return res.status(400).json({
             status: "error",
@@ -37,21 +24,6 @@ const save = (req, res) => {
         .catch((err) => {
             console.log(`❌ Error de guardado: ${err}`)
         })
-
-    /*article.save((err, articleSaved) => {
-        if (err || !articleSaved) {
-            return res.status(400).json({
-                status: "error",
-                msg: '❌ The article hasnt been saved'
-            })  
-        }
-
-        return res.status(200).json({
-            status: "success",
-            article: articleSaved,
-            msg: "✅ Article successfully created!"
-        })
-    })*/
 
     return res.status(200).json({
         msg: "Success",
@@ -98,9 +70,97 @@ const getOne = async (req, res) => {
 
 }
 
+const kill = async (req, res) => {
+    let id = req.params.id
+
+    try {
+        await Article.findOneAndDelete({ _id: id })
+        res.status(200).json({
+            status: "success",
+            msg: "Article successfully deleted!"
+        })
+    } catch (err) {
+        res.status(400).json({
+            status: "error",
+            msg: "No article were found!"
+        })
+    }
+}
+
+const edit = async (req, res) => {
+    let id = req.params.id
+    let params = req.body
+
+    try {
+        validateArticle(res, params)
+    } catch (error) {
+        return res.status(400).json({
+            status: "error",
+            msg: '❌ An error occurred'
+        })
+    }
+
+    try {
+        const updatedArticle = await Article.findOneAndUpdate({ _id: id }, params)
+        res.status(200).json({
+            status: "success",
+            msg: "Article updated successfully!",
+            article: updatedArticle
+        })
+    } catch (error) {
+        return res.status(400).json({
+            status: "error",
+            msg: '❌ Article couldnt be updated'
+        })
+    }
+
+}
+
+const upload = (req, res) => {
+
+    if (!req.file && !req.files) {
+        return res.status(404).json({
+            status: "error",
+            msg: "❌ Invalid request"
+        })
+    }
+
+    let fileName = req.file.originalname
+    let file_split = file.split("\.")
+    let extension = file_split[1]
+
+    if (extension != "png" && extension != "jpg" && extension != "jpeg" && extension != "gif") {
+        fs.unlink(req.file.path, (err) => {
+            return res.status(400).json({
+                status: "error",
+                msg: "❌ Extension not valid"
+            })
+        })
+    } else {
+        let id = req.params.id
+
+        try {
+            const updatedArticle = Article.findOneAndUpdate({ _id: id }, { image: req.file.filename })
+            res.status(200).json({
+                status: "success",
+                msg: "Article updated successfully!",
+                article: updatedArticle,
+                file: req.file
+            })
+        } catch (error) {
+            return res.status(400).json({
+                status: "error",
+                msg: '❌ Article couldnt be updated'
+            })
+        }
+    }
+}
+
 module.exports = {
-    test,
     save,
     get,
-    getOne
+    getOne,
+    kill,
+    edit,
+    upload
 }
